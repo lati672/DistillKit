@@ -21,14 +21,14 @@ config = {
         "student": "Qwen/Qwen2-1.5B"
     },
     "tokenizer": {
-        "max_length": 4096,
+        "max_length": 1024,
         "chat_template": "{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n' }}{% endif %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
     },
     "training": {
         "output_dir": "./results",
         "num_train_epochs": 3,
         "per_device_train_batch_size": 1,
-        "gradient_accumulation_steps": 8,
+        "gradient_accumulation_steps": 4,
         "save_steps": 1000,
         "logging_steps": 1,
         "learning_rate": 2e-5,
