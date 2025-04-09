@@ -44,7 +44,7 @@ config = {
         "alpha": 0.5
     },
     "model_config": {
-        "use_flash_attention": True
+        "use_flash_attention": False
     }
     # "spectrum": {
     #     "layers_to_unfreeze": "/workspace/spectrum/snr_results_Qwen-Qwen2-1.5B_unfrozenparameters_50percent.yaml" # You can pass a spectrum yaml file here to freeze layers identified by spectrum.
@@ -167,16 +167,31 @@ class LogitsTrainer(SFTTrainer):
 # Training arguments
 training_arguments = TrainingArguments(**config["training"])
 
+training_config = SFTConfig(
+    **config["training"],
+    tokenizer=student_tokenizer,
+    max_seq_length=config["tokenizer"]["max_length"],
+    dataset_num_proc=4,
+    packing=False,
+    report_to="none",
+    seed=42,  # 可选：控制训练可复现
+)
 # Create the custom SFT Trainer
 trainer = LogitsTrainer(
     model=student_model,
     train_dataset=tokenized_dataset["train"],
     eval_dataset=tokenized_dataset["test"],
-    tokenizer=student_tokenizer,
-    args=training_arguments,
-    max_seq_length=config["tokenizer"]["max_length"],
-    dataset_text_field="text",
+    args=training_config,
 )
+# trainer = LogitsTrainer(
+#     model=student_model,
+#     train_dataset=tokenized_dataset["train"],
+#     eval_dataset=tokenized_dataset["test"],
+#     tokenizer=student_tokenizer,
+#     args=training_arguments,
+#     max_seq_length=config["tokenizer"]["max_length"],
+#     dataset_text_field="text",
+# )
 
 # Add the teacher model to the trainer
 trainer.teacher_model = teacher_model

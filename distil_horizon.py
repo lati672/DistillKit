@@ -155,34 +155,62 @@ class LogitsTrainer(SFTTrainer):
     # the shape of logits is (batch_size, seq_len, vocab_size)
     # the logits[b, s, :] is p(x|x[0:s])
     def distillation_loss(self, student_logits, teacher_logits, inputs, original_loss):
+       
+    # Get input IDs for the input text
+        input_ids = self.tokenizer.encode(inputs, add_special_tokens=True)  # this converts text to IDs
+        print(f"Input IDs: {input_ids}")  # For debugging or checking
+
         student_logits, teacher_logits = pad_logits(student_logits.to(self.model.device), teacher_logits.to(self.model.device))
         
-        student_logits_scaled = student_logits / config["distillation"]["temperature"]
-        teacher_logits_scaled = teacher_logits / config["distillation"]["temperature"]
+        temperature = config["distillation"]["temperature"]
+        max_length = config["tokenizer"]["max_length"]
+        alpha = config["distillation"]["alpha"]  # Alpha value for weighting the loss
 
+        # Apply temperature scaling to the logits
+        student_logits_scaled = student_logits / temperature
+        teacher_logits_scaled = teacher_logits / temperature
+
+        # Calculate probabilities for the student model using softmax
+        student_probs = F.softmax(student_logits_scaled, dim=-1)  # shape: [batch_size, seq_len, vocab_size]
+        
+        # Initialize the token_weights tensor (shape: [batch_size, seq_len])
+        batch_size, seq_len, vocab_size = student_probs.shape
+        token_weights = torch.ones((batch_size, seq_len), device=student_probs.device)  # token_weights[:, 0] = 1 (already initialized)
+
+        # Populate the token_weights tensor for i > 0
+        for i in range(1, seq_len):
+            # Get the input ID for the previous token at position i-1
+            prev_token_id = input_ids[i-1]
+            
+            # Get the probability of the previous token at position i-1 from the student model
+            # Add 1 to the probability as per the new modification
+            token_weights[:, i] = student_probs[:, i, prev_token_id] + 1
+
+        # Optionally print or log the token_weights tensor for debugging
+        if config.get("debug", False):
+            print(f"Token Weights:\n{token_weights}")
+
+        # KL divergence loss between softened student and teacher logits
         loss_kd = F.kl_div(
             F.log_softmax(student_logits_scaled, dim=-1),
             F.softmax(teacher_logits_scaled, dim=-1),
             reduction='none',
-        ) * (config["distillation"]["temperature"] ** 2) / config["tokenizer"]["max_length"]
-        # create a batch * seq_len torch tensor of 1s
-        tensor_ones = torch.ones_like(loss_kd)
-        # for tensor_ones[:, i>2], plus the argmax of the teacher logits
-        tensor_ones[:, 2:] += torch.argmax(teacher_logits_scaled[:, 2:], dim=-1)
-        loss_kd = loss_kd * tensor_ones
-        # take the mean of the loss_kd
-        loss_kd = torch.mean(loss_kd)
-        # loss_kd = F.kl_div(
-        #     F.log_softmax(student_logits_scaled, dim=-1),
-        #     F.softmax(teacher_logits_scaled, dim=-1),
-        #     reduction='batchmean'
-        # ) * (config["distillation"]["temperature"] ** 2) / config["tokenizer"]["max_length"]
+        ) * (temperature ** 2) / max_length
 
-        return config["distillation"]["alpha"] * loss_kd + (1 - config["distillation"]["alpha"]) * original_loss
+        loss_kd = loss_kd.sum(dim=-1)  # sum over vocab dimension
+
+        # Point-wise multiplication between token_weights and loss_kd
+        weighted_token_loss = (token_weights * loss_kd).mean()  # Mean over all positions in the sequence
+
+        # Compute the weighted loss
+        weighted_loss = alpha * weighted_token_loss + (1 - alpha) * original_loss
+
+        return weighted_loss
 
 # Training arguments
 training_arguments = TrainingArguments(**config["training"])
 
+train
 # Create the custom SFT Trainer
 trainer = LogitsTrainer(
     model=student_model,
