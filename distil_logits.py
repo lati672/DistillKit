@@ -169,7 +169,7 @@ training_arguments = TrainingArguments(**config["training"])
 
 training_config = SFTConfig(
     **config["training"],
-    tokenizer=student_tokenizer,
+    preprocessing_class=student_tokenizer,
     max_seq_length=config["tokenizer"]["max_length"],
     dataset_num_proc=4,
     packing=False,
