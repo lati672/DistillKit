@@ -214,7 +214,6 @@ training_arguments = TrainingArguments(**config["training"])
 
 training_config = SFTConfig(
     **config["training"],
-    preprocessing_class=student_tokenizer,
     max_seq_length=config["tokenizer"]["max_length"],
     dataset_num_proc=4,
     packing=False,
@@ -224,6 +223,7 @@ training_config = SFTConfig(
 # Create the custom SFT Trainer
 trainer = LogitsTrainer(
     model=student_model,
+    processing_class=student_tokenizer,
     train_dataset=tokenized_dataset["train"],
     eval_dataset=tokenized_dataset["test"],
     args=training_config,
