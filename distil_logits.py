@@ -136,7 +136,7 @@ def pad_logits(student_logits, teacher_logits):
     return student_logits, teacher_logits
 
 class LogitsTrainer(SFTTrainer):
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         inputs = {k: v.to(model.device) if hasattr(v, 'to') else v for k, v in inputs.items()}
         self.teacher_model = self.teacher_model.to(model.device)
         
