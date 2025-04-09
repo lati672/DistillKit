@@ -6,9 +6,9 @@ from trl import SFTTrainer, SFTConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 from accelerate import Accelerator
 import yaml
-
 # Configuration
 config = {
+    "cache_dir": "./cache",
     "project_name": "distil-logits",
     "dataset": {
         "name": "mlabonne/FineTome-100k",
@@ -57,14 +57,14 @@ accelerator = Accelerator()
 device = accelerator.device
 
 # Load and preprocess dataset
-dataset = load_dataset(config["dataset"]["name"], split=config["dataset"]["split"])
+dataset = load_dataset(config["dataset"]["name"], split=config["dataset"]["split"], cache_dir=config["cache_dir"])
 dataset = dataset.shuffle(seed=config["dataset"]["seed"])
 if "num_samples" in config["dataset"]:
     dataset = dataset.select(range(config["dataset"]["num_samples"]))
 
 # Load tokenizers
-teacher_tokenizer = AutoTokenizer.from_pretrained(config["models"]["teacher"])
-student_tokenizer = AutoTokenizer.from_pretrained(config["models"]["student"])
+teacher_tokenizer = AutoTokenizer.from_pretrained(config["models"]["teacher"], cache_dir=config["cache_dir"])
+student_tokenizer = AutoTokenizer.from_pretrained(config["models"]["student"], cache_dir=config["cache_dir"])
 
 # Apply chat template to student tokenizer
 student_tokenizer.chat_template = config["tokenizer"]["chat_template"]
@@ -107,8 +107,8 @@ model_kwargs = {"torch_dtype": torch.bfloat16}
 if config["model_config"]["use_flash_attention"]:
     model_kwargs["attn_implementation"] = "flash_attention_2"
 
-teacher_model = AutoModelForCausalLM.from_pretrained(config["models"]["teacher"], **model_kwargs)
-student_model = AutoModelForCausalLM.from_pretrained(config["models"]["student"], **model_kwargs)
+teacher_model = AutoModelForCausalLM.from_pretrained(config["models"]["teacher"], cache_dir=config["cache_dir"], **model_kwargs)
+student_model = AutoModelForCausalLM.from_pretrained(config["models"]["student"], cache_dir=config["cache_dir"], **model_kwargs)
 
 # Optionally freeze layers of the student model based on spectrum configuration
 if "spectrum" in config and "layers_to_unfreeze" in config["spectrum"]:
